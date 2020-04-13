@@ -11,6 +11,7 @@ library(shiny)
 library(shinydashboard)
 library(tidyverse)
 library(shinyjs)
+library(lubridate)
 
 #temp_data <- write_csv(tibble(words = "blank"), "bowls_words.csv")
 
@@ -24,37 +25,41 @@ ui <- dashboardPage(
               icon = icon("play"))
   )), #close dashboardsidebar
   dashboardBody(
-                tabItems(
-                  tabItem(tabName = "submission",
-                fluidRow(box(width = 6, title = "Enter bowls list", 
-                             solidHeader = T,# height = 500, 
-                             status = "primary",  collapsible = T,    
-                             
-                textInput("name", "Your name:"), 
-                tags$br(),
-                tags$hr(),
-                tags$br(), 
-                textInput("word1", "Enter first word: "), 
-                textInput("word2", "Enter second word: "), 
-                textInput("word3", "Enter third word: "), 
-                textInput("word4", "Enter fourth word: "), 
-                textInput("word5", "Enter fifth word: "), 
-                textInput("word6", "Enter sixth word: "), 
-                textInput("word7", "Enter seventh word: "),
-    actionButton("submit", "Submit Words!", icon = icon("paper-plane"), 
-                 style = "color: white; 
+    tabItems(
+      tabItem(tabName = "submission",
+              fluidRow(box(width = 6, title = "Enter bowls list", 
+                           solidHeader = T,# height = 500, 
+                           status = "primary",  collapsible = T,    
+                           
+                           textInput("name", "Your name:"), 
+                           tags$br(),
+                           tags$hr(),
+                           tags$br(), 
+                           textInput("word1", "Enter first word: "), 
+                           textInput("word2", "Enter second word: "), 
+                           textInput("word3", "Enter third word: "), 
+                           textInput("word4", "Enter fourth word: "), 
+                           textInput("word5", "Enter fifth word: "), 
+                           textInput("word6", "Enter sixth word: "), 
+                           textInput("word7", "Enter seventh word: "),
+                           actionButton("submit", "Submit Words!", icon = icon("paper-plane"), 
+                                        style = "color: white; 
                                        background-color: #1F65CC; 
                                        position: relative;
                                        height: 35px;
                                        width: 200px;")))),
-    tabItem(tabName = "play_game",
-            h3("Let's play bowls!!"),
-         uiOutput("bowls_game"),
-          uiOutput("score")))
+      tabItem(tabName = "play_game",
+              h3("Let's play bowls!!"),
+              uiOutput("bowls_game"),
+              uiOutput("score")))
   ) # dashboard body close
 ) #dashboard page close 
 
 server <- function(input, output, session) {
+  
+  # Initialize the timer, 10 seconds, not active.
+  timer <- reactiveVal(60)
+  active <- reactiveVal(FALSE)
   
   observeEvent(input$submit, {    
     showModal(modalDialog(paste0(input$name, ", your words for bowls have been entered!!!"),
@@ -62,7 +67,7 @@ server <- function(input, output, session) {
     all_inputs <- reactiveValuesToList(input)
     
     input_words <- str_detect(names(all_inputs), 
-                                     "word")
+                              "word")
     keep_words <- unlist(all_inputs[input_words])
     
     write_csv(tibble(words = keep_words), paste0(input$name, "_bowls.csv"))
@@ -77,11 +82,11 @@ server <- function(input, output, session) {
     updateTextInput(session,"word5", value = "") 
     updateTextInput(session,"word6", value = "") 
     updateTextInput(session,"word7", value = "")
-
-  }) 
-
     
- #reactive data values, updated and used throughout  
+  }) 
+  
+  
+  #reactive data values, updated and used throughout  
   remaining_words <- reactiveValues(data = NULL)
   word_showing <- reactiveValues(data = NULL)
   score <- reactiveValues(team1 = 0, team2 = 0)
@@ -90,35 +95,34 @@ server <- function(input, output, session) {
   
   observeEvent({input$restart_list}, {
     if(length(list.files()[str_detect(list.files(), "bowls.csv")]) == 0) {
-          NULL
-        } else {
-          remaining_words$data  <- (list.files()[str_detect(list.files(), "bowls.csv")]  %>%
-                                      map_df(read_csv) %>% pull(words))
-          word_showing$data <- NULL
-          turns$begin <- 0
-          turns$end <- 0
-
-        #write_csv(temp, "remaining_words.csv")
-        #temp %>% pull(words)
-        }
+      NULL
+    } else {
+      remaining_words$data  <- (list.files()[str_detect(list.files(), "bowls.csv")]  %>%
+                                  map_df(read_csv) %>% pull(words))
+      word_showing$data <- NULL
+      turns$begin <- 0
+      turns$end <- 0
+      
+      #write_csv(temp, "remaining_words.csv")
+      #temp %>% pull(words)
+    }
     #remaining_words$data <- (read_csv("remaining_words.csv") %>%
     #pull(words))
-  
+    
   })
   
   observeEvent({input$start_new_game}, 
                {
-               list.files()[str_detect(list.files(), "csv")]  %>%
-                 map(file.remove)
-                remaining_words$data <- NULL
-                word_showing$data <- NULL
-                score$team1 <- 0
-                score$team2 <- 0
+                 list.files()[str_detect(list.files(), "csv")]  %>%
+                   map(file.remove)
+                 remaining_words$data <- NULL
+                 word_showing$data <- NULL
+                 score$team1 <- 0
+                 score$team2 <- 0
                }
-)
+  )
   
   output$bowls_game <- renderUI({
-
     
     box(width = 9, title = "Enter bowls list", 
         solidHeader = T,# height = 500, 
@@ -130,11 +134,11 @@ server <- function(input, output, session) {
                                        height: 35px;
                                        width: 400px;"),
         tags$h5(paste0("There are ", length(remaining_words$data), " words remaining in the bowl.")), 
-
+        
         tags$br(),
         if(file.exists("remaining_words.csv")) {
-        actionButton("remaining", "Reload remaining words & update score (press before you begin your turn)",
-                     style = "color: white; 
+          actionButton("remaining", "Reload remaining words & update score (press before you begin your turn)",
+                       style = "color: white; 
                                        background-color: green; 
                                        position: relative;
                                        height: 35px;
@@ -143,31 +147,32 @@ server <- function(input, output, session) {
         tags$b(h3(textOutput("guess_this"))), 
         tags$hr(), 
         tags$br(),
-      if(turns$begin > turns$end) {
-        tagList(
-          actionButton("correct", "Next (correct answer)",
-                       style = "color: white; 
+        if(turns$begin > turns$end) {
+          tagList(
+            actionButton("correct", "Next (correct answer)",
+                         style = "color: white; 
                                        background-color: green; 
                                        position: relative;
                                        height: 35px;
                                        width: 200px;"), 
-          actionButton("pass", "Pass",   style = "color: white;
+            actionButton("pass", "Pass",   style = "color: white;
                                     background-color: red;
                                     position: relative;
                                     height: 35px;
                                     width: 200px;"))} else {
-        radioButtons("team_select", "Select which team's turn:",
-                     choices = c("Team 1", "Team 2"), selected = "Team 1")}, 
-      tags$br(), 
-      tags$hr(), 
-      if(turns$begin == turns$end) { 
-      actionButton("begin_turn", "Begin Turn",   style = "color: white; 
+                                      radioButtons("team_select", "Select which team's turn:",
+                                                   choices = c("Team 1", "Team 2"), selected = "Team 1")}, 
+        tags$br(), 
+        tags$hr(), 
+        textOutput('timeleft'),
+        if(turns$begin == turns$end) { 
+          actionButton("begin_turn", "Begin Turn",   style = "color: white; 
                                        background-color: green; 
                                        position: relative;
                                        height: 35px;
                                        width: 200px;") },
-      if(turns$begin > turns$end) {
-      actionButton("end_turn", "End Turn",   style = "color: white; 
+        if(turns$begin > turns$end) {
+          actionButton("end_turn", "End Turn",   style = "color: white; 
                                        background-color: blue; 
                                        position: relative;
                                        height: 35px;
@@ -188,49 +193,74 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$correct, 
-                   { 
-   
-              
-                if(!is.null(word_showing$data)) {
-                  remaining_words$data <- remaining_words$data[remaining_words$data != word_showing$data]
-                }
-               
-               
-               if(length(remaining_words$data) == 0) {
-                 word_showing$data = "There are no remaining words."
-               } else {
-                 word_showing$data <- sample(remaining_words$data, size = 1)
-               }
+               { 
                  
-               })
-  
-  
-  output$guess_this <- reactive({
-
-      if(is.null(word_showing$data)) {
-        if(length(remaining_words$data) == 0) {
-          "There are no remaining words in the queue, press restart or submit new words" } else {
-            "Press Begin Turn"
-          }
-      } else {
-        word_showing$data
-      }
-    
-  })
-  
-  
-  observeEvent({input$pass}, {
-               if(!is.null(input$begin_turn)) { 
+                 
+                 if(!is.null(word_showing$data)) {
+                   remaining_words$data <- remaining_words$data[remaining_words$data != word_showing$data]
+                 }
+                 
+                 
                  if(length(remaining_words$data) == 0) {
                    word_showing$data = "There are no remaining words."
                  } else {
                    word_showing$data <- sample(remaining_words$data, size = 1)
                  }
                  
-               }
+               })
+  
+  
+  output$guess_this <- reactive({
+    
+    if(is.null(word_showing$data)) {
+      if(length(remaining_words$data) == 0) {
+        "There are no remaining words in the queue, press restart or submit new words" } else {
+          "Press Begin Turn"
+        }
+    } else {
+      word_showing$data
+    }
+    
+  })
+  
+  
+  observeEvent({input$pass}, {
+    if(!is.null(input$begin_turn)) { 
+      if(length(remaining_words$data) == 0) {
+        word_showing$data = "There are no remaining words."
+      } else {
+        word_showing$data <- sample(remaining_words$data, size = 1)
+      }
+      
+    }
+  })
+  
+  # Output the time left.
+  output$timeleft <- renderText({
+    paste("Time left: ", seconds_to_period(timer()))
+  })
+  
+  # observer that invalidates every second. If timer is active, decrease by one.
+  observe({
+    invalidateLater(1000, session)
+    isolate({
+      if(active())
+      {
+        timer(timer()-1)
+        if(timer()<1)
+        {
+          active(FALSE)
+          showModal(modalDialog(
+            title = "Important message",
+            "Countdown completed!"
+          ))
+        }
+      }
     })
+  })
   
   observeEvent(input$begin_turn, {
+    active(TRUE)
     if(length(remaining_words$data) == 0) {
       word_showing$data = "There are no remaining words."
     } else {
@@ -261,11 +291,11 @@ server <- function(input, output, session) {
     write.csv(tibble("Team 1" = score$team1, "Team 2" = score$team2),
               "score.csv", 
               row.names = FALSE)
-  
+    
   })
   
-
-# Scoring the game 
+  
+  # Scoring the game 
   output$score <- renderUI({
     
     box(width = 3, title = "Score", 
@@ -285,9 +315,9 @@ server <- function(input, output, session) {
         ),
         tags$br(), 
         tags$br(),
-    # DT::dataTableOutput("score_table"), 
-     actionButton("start_new_game", "New Game",
-                  style = "color: white; 
+        # DT::dataTableOutput("score_table"), 
+        actionButton("start_new_game", "New Game",
+                     style = "color: white; 
                                        background-color: red; 
                                        position: relative;
                                        height: 35px;
